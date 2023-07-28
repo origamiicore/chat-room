@@ -1,0 +1,77 @@
+<html>
+    <body>
+        <script>
+            var baseUrl='ws://localhost:4000';
+            const client = new WebSocket(baseUrl, 'echo-protocol');
+            var token=''
+            var temp={};
+            var id=2;
+            function callApi(domain,service,param,callBack) {
+                id++;
+                if(callBack)
+                {
+                    temp[id.toString()]={callBack}
+                    client.send(JSON.stringify({domain,service,param,id,token})); 
+                }
+                else
+                {
+                    return new Promise((res,rej)=>{
+                        temp[id.toString()]={res,rej}
+                        client.send(JSON.stringify({domain,service,param,id,token})); 
+                    })                    
+                }
+            } 
+            client.addEventListener('message', function (event) {
+                var data=JSON.parse(event.data) ; 
+                var id=data.id.toString();
+                if(data.session?.token)
+                {
+                    token=data.session?.token;
+                }
+                if(temp[id])
+                {
+                    if(temp[id].callBack)
+                    {
+                        temp[id].callBack(data)
+                    }
+                    else
+                    {
+                        if(data.error)temp[id].rej(data.error)
+                        else temp[id].res(data.data)
+                    }
+                } 
+            });
+            async function login()
+            {
+                var data =await callApi('api','login',{name:document.getElementById("username").value})
+                if(token)
+                {
+                    document.getElementById("username").style.visibility='hidden';
+                    document.getElementById("loginbt").style.visibility='hidden';
+                    document.getElementById("message").style.visibility='';
+                    document.getElementById("sendbt").style.visibility='';
+                    document.getElementById("messagediv").style.visibility='';
+                    var data =await callApi('api','listen',{},(msg)=>{
+                        let message=msg.data.response.data
+                        let from=message.from
+                        let text=message.text
+                        document.getElementById('messagediv').innerHTML+='<div><span style="font-size: 21px;font-weight: bold;">'+
+                            from+'</span> : '+text+'</div>'
+                    })
+                }
+            }
+            async function send()
+            {
+                var data =await callApi('api','send',{text:document.getElementById("message").value})
+            }
+        </script>
+        <input id="username" />
+        <button id="loginbt" onclick="login()">Login</button>
+
+        <input id="message" style="visibility: hidden;" />
+        <button id="sendbt" onclick="send()" style="visibility: hidden;" >Send</button>
+        <div id="messagediv" style="visibility: hidden;" >
+
+        </div>
+    </body>
+</html>
