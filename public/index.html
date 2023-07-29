@@ -2,10 +2,21 @@
     <body>
         <script>
             var baseUrl='ws://localhost:4000';
-            const client = new WebSocket(baseUrl, 'echo-protocol');
+            var client ={}; 
             var token=''
             var temp={};
             var id=2;
+            function connect()
+            {
+                client =new WebSocket(baseUrl, 'echo-protocol');
+                client.addEventListener('open', async function (event) { 
+                    
+                    document.getElementById("connectbt").style.visibility='hidden';
+                    document.getElementById("username").style.visibility='';
+                    document.getElementById("loginbt").style.visibility='';
+                    addListener()
+                });
+            }
             function callApi(domain,service,param,callBack) {
                 id++;
                 if(callBack)
@@ -21,26 +32,51 @@
                     })                    
                 }
             } 
-            client.addEventListener('message', function (event) {
-                var data=JSON.parse(event.data) ; 
-                var id=data.id.toString();
-                if(data.session?.token)
+            function addListener()
+            {
+                client.addEventListener('message', function (event) {
+                    var data=JSON.parse(event.data) ; 
+                    var id=data.id.toString();
+                    if(data.session?.token)
+                    {
+                        token=data.session?.token;
+                    }
+                    if(temp[id])
+                    {
+                        if(temp[id].callBack)
+                        {
+                            temp[id].callBack(data)
+                        }
+                        else
+                        {
+                            if(data.error)temp[id].rej(data.error)
+                            else temp[id].res(data.data)
+                        }
+                    } 
+                });
+            }
+            async function logout()
+            {
+                client.close()
+                document.getElementById("username").style.visibility='hidden';
+                document.getElementById("loginbt").style.visibility='hidden';
+                document.getElementById("message").style.visibility='hidden';
+                document.getElementById("sendbt").style.visibility='hidden';
+                document.getElementById("maindiv").style.visibility='hidden';
+                document.getElementById("logout").style.visibility='hidden';
+                document.getElementById("connectbt").style.visibility='';
+            }
+            async function UpdateOnlineList()
+            { 
+                var resp=await callApi('api','getOnlineUser',{})
+                let names=resp.response.data
+                let str=''
+                for(let name of names)
                 {
-                    token=data.session?.token;
+                    str+='<div>'+name+'</div>'
                 }
-                if(temp[id])
-                {
-                    if(temp[id].callBack)
-                    {
-                        temp[id].callBack(data)
-                    }
-                    else
-                    {
-                        if(data.error)temp[id].rej(data.error)
-                        else temp[id].res(data.data)
-                    }
-                } 
-            });
+                document.getElementById("onlineuserdiv").innerHTML=str;
+            }
             async function login()
             {
                 var data =await callApi('api','login',{name:document.getElementById("username").value})
@@ -50,13 +86,39 @@
                     document.getElementById("loginbt").style.visibility='hidden';
                     document.getElementById("message").style.visibility='';
                     document.getElementById("sendbt").style.visibility='';
-                    document.getElementById("messagediv").style.visibility='';
+                    document.getElementById("maindiv").style.visibility='';
+                    document.getElementById("logout").style.visibility='';
+                    UpdateOnlineList()
                     var data =await callApi('api','listen',{},(msg)=>{
                         let message=msg.data.response.data
-                        let from=message.from
-                        let text=message.text
-                        document.getElementById('messagediv').innerHTML+='<div><span style="font-size: 21px;font-weight: bold;">'+
-                            from+'</span> : '+text+'</div>'
+                        let type=message.type
+                        if(type==2)
+                        {
+                            let from=message.from
+                            let text=message.text
+                            document.getElementById('messagediv').innerHTML+='<div><span style="font-size: 21px;font-weight: bold;">'+
+                                from+'</span> : '+text+'</div>'
+                        }
+                        else if(type==3)
+                        {
+                            let from=message.from
+                            UpdateOnlineList()
+                            document.getElementById('messagediv').innerHTML+='<div><span style="font-size: 21px;font-weight: bold;">'+
+                                from+'</span> is logged out</div>'
+                        }
+                        else if(type==4)
+                        {
+                            let from=message.from
+                            let count=message.count
+                            document.getElementById('messagediv').innerHTML+='<div> Connection Count :'+count+'</div>'
+                        }
+                        else
+                        {
+                            let from=message.from
+                            UpdateOnlineList()
+                            document.getElementById('messagediv').innerHTML+='<div><span style="font-size: 21px;font-weight: bold;">'+
+                                from+'</span> is logged in</div>'
+                        }
                     })
                 }
             }
@@ -65,13 +127,25 @@
                 var data =await callApi('api','send',{text:document.getElementById("message").value})
             }
         </script>
-        <input id="username" />
-        <button id="loginbt" onclick="login()">Login</button>
+        <style>
+            .row {
+                display: flex;
+            }
 
+            .column {
+                flex: 50%;
+            }
+        </style>
+        <button id="connectbt" onclick="connect()">Connect</button>
+        <input id="username" style="visibility: hidden;" />
+        <button id="loginbt" onclick="login()" style="visibility: hidden;" >Login</button>
         <input id="message" style="visibility: hidden;" />
         <button id="sendbt" onclick="send()" style="visibility: hidden;" >Send</button>
-        <div id="messagediv" style="visibility: hidden;" >
 
-        </div>
+        <div class="row" id="maindiv" style="visibility: hidden;" style="width: 300px;">
+            <div id="onlineuserdiv" class="column"></div>
+            <div id="messagediv" class="column"></div>
+        </div> 
+        <button id="logout" onclick="logout()" style="visibility: hidden;">Logout</button>
     </body>
 </html>

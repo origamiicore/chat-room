@@ -1,17 +1,14 @@
 import BaseMessage, { MessageType } from "./baseMessage";
 
-export default class MessageModel extends BaseMessage
+export default class LoginMessageModel extends BaseMessage
 {
-    text:string;
     constructor(data:{
         from:string;
-        text:string;
     })
     {
         super({
             from:data.from,
-            type:MessageType.Text
+            type:MessageType.Login
         })
-        this.text=data.text;
     }
 }
